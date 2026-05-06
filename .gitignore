@@ -1,0 +1,39 @@
+__pycache__/
+*.py[cod]
+
+# Editor/OS noise
+*.swp
+*.swo
+.*.swp
+.*.swo
+*.kate-swp
+.*.kate-swp
+.DS_Store
+
+# Logs and runtime leftovers
+*.log
+*.pid
+*.sock
+
+# Generated benchmark output
+bench/results/
+
+# Personal/local chat archive
+chats/
+
+# Cloned upstream TurboQuant/llama.cpp source checkout
+src/
+
+# Local model/checkpoint artifacts if someone stores them here
+models/
+*.gguf
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.onnx
+
+# Local env/config secrets
+.env
+.env.*
+!.env.example
