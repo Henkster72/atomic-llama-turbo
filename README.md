@@ -246,6 +246,8 @@ Download the benchmark list from `MODEL_LIST.md`, skipping rows already marked `
 ./download-bench-models.sh
 ```
 
+After each successful prefetch attempt, the script changes that row in `MODEL_LIST.md` from `Downloaded=no` to `Downloaded=yes`. Use `--no-mark` if you want a read-only run.
+
 Preview the full benchmark list, including already downloaded rows:
 
 ```bash

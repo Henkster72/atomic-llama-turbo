@@ -7,6 +7,7 @@ INSTALLER="${INSTALLER:-$SCRIPT_DIR/install-models.sh}"
 INCLUDE_DOWNLOADED=0
 DRY_RUN=0
 LIST_ONLY=0
+MARK_DOWNLOADED=1
 
 usage() {
   cat <<'EOF'
@@ -17,6 +18,7 @@ Usage:
   ./download-bench-models.sh --all       include rows already marked Downloaded=yes
   ./download-bench-models.sh --dry-run   show fit notes and prefetch commands only
   ./download-bench-models.sh --list      show model/profile mapping only
+  ./download-bench-models.sh --no-mark   do not change Downloaded=no to yes after prefetch
 
 Environment:
   MODEL_LIST          CSV-style manifest, default ./MODEL_LIST.md
@@ -38,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --list)
       LIST_ONLY=1
+      shift
+      ;;
+    --no-mark)
+      MARK_DOWNLOADED=0
       shift
       ;;
     -h|--help)
@@ -109,6 +115,27 @@ load_profile() {
   CACHE_V=
   # shellcheck source=/dev/null
   source "$path"
+}
+
+mark_downloaded() {
+  local model="$1"
+  local tmp
+  tmp="$(mktemp)"
+  awk -F, -v target="$model" '
+    BEGIN { OFS = "," }
+    NR == 1 { print; next }
+    {
+      left = $1
+      right = $2
+      gsub(/^[[:space:]]+|[[:space:]]+$/, "", left)
+      if (left == target) {
+        print $1, "yes"
+      } else {
+        print
+      }
+    }
+  ' "$MODEL_LIST" > "$tmp"
+  mv "$tmp" "$MODEL_LIST"
 }
 
 fit_note() {
@@ -187,6 +214,10 @@ while IFS=, read -r model downloaded; do
     "$INSTALLER" --dry-run --profile "$profile"
   else
     "$INSTALLER" --profile "$profile"
+    if [[ "$MARK_DOWNLOADED" == "1" ]]; then
+      mark_downloaded "$MODEL"
+      echo "  manifest: marked Downloaded=yes"
+    fi
   fi
   echo
 done < <(model_rows)

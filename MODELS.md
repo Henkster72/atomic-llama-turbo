@@ -82,6 +82,8 @@ Default installer behavior downloads only the validated Qwen Q4 profile.
 
 Default behavior skips rows marked `Downloaded=yes`. Use `--all` when you want the script to include those too.
 
+After each successful prefetch attempt, `download-bench-models.sh` updates the matching manifest row to `Downloaded=yes`. Use `--no-mark` when you want to keep the manifest unchanged.
+
 Suitability on the validated 6GB VRAM / 24GB RAM machine:
 
 | Profile | Fit notes |
