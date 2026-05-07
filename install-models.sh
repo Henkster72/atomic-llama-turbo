@@ -7,6 +7,7 @@ IMAGE="${IMAGE:-llama-turboquant-cuda}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-podman}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-7200}"
 PREFETCH_PORT="${PREFETCH_PORT:-18080}"
+PREFETCH_POLL_SECONDS="${PREFETCH_POLL_SECONDS:-5}"
 
 usage() {
   cat <<'EOF'
@@ -35,6 +36,7 @@ Environment:
   IMAGE               container image, default llama-turboquant-cuda
   CONTAINER_RUNTIME   podman or docker, default podman
   TIMEOUT_SECONDS     timeout per model server prefetch attempt, default 7200
+  PREFETCH_POLL_SECONDS  seconds between temporary server log checks, default 5
   HF_TOKEN            optional Hugging Face token
   PREFETCH_PORT       temporary container server port, default 18080
 EOF
@@ -123,6 +125,67 @@ volume_spec() {
   fi
 }
 
+cache_path_for_model() {
+  local model="$1"
+  local repo="${model%%:*}"
+  local encoded="${repo//\//--}"
+  printf '%s/hub/models--%s\n' "$HF_CACHE" "$encoded"
+}
+
+cache_has_model() {
+  local model="$1"
+  local quant=""
+  local repo_path
+  if [[ "$model" == *:* ]]; then
+    quant="${model#*:}"
+  fi
+  repo_path="$(cache_path_for_model "$model")"
+  [[ -d "$repo_path/snapshots" ]] || return 1
+  if [[ -n "$quant" ]]; then
+    find -L "$repo_path/snapshots" -type f -iname "*.gguf" -iname "*${quant}*" -print -quit | grep -q .
+  else
+    find -L "$repo_path/snapshots" -type f -iname "*.gguf" -print -quit | grep -q .
+  fi
+}
+
+stop_prefetch_container() {
+  local name="$1"
+  "$CONTAINER_RUNTIME" stop "$name" >/dev/null 2>&1 || true
+}
+
+wait_for_prefetch() {
+  local name="$1"
+  local start now elapsed status logs
+  start="$(date +%s)"
+  while true; do
+    logs="$("$CONTAINER_RUNTIME" logs "$name" 2>&1 || true)"
+    if grep -q "main: model loaded" <<< "$logs"; then
+      echo "    model loaded; stopping temporary prefetch server"
+      stop_prefetch_container "$name"
+      return 0
+    fi
+
+    status="$("$CONTAINER_RUNTIME" inspect --format '{{.State.Status}}' "$name" 2>/dev/null || true)"
+    if [[ "$status" == "exited" || "$status" == "dead" ]]; then
+      echo "$logs" | tail -n 80 >&2
+      echo "    prefetch container exited before model loaded" >&2
+      return 1
+    fi
+
+    now="$(date +%s)"
+    elapsed=$((now - start))
+    if (( elapsed >= TIMEOUT_SECONDS )); then
+      echo "$logs" | tail -n 80 >&2
+      echo "    timeout after ${TIMEOUT_SECONDS}s; stopping temporary prefetch server" >&2
+      stop_prefetch_container "$name"
+      return 124
+    fi
+
+    printf '    waiting for model load... %ss elapsed\r' "$elapsed"
+    sleep "$PREFETCH_POLL_SECONDS"
+  done
+}
+
 download_one() {
   local profile="$1"
   MODEL=
@@ -140,13 +203,22 @@ download_one() {
   echo "    model: $MODEL"
   echo "    cache: $HF_CACHE"
 
+  if cache_has_model "$MODEL"; then
+    echo "    already present in cache"
+    return 0
+  fi
+
   local args=()
   mapfile -t args < <(runtime_args)
   local volume
   volume="$(volume_spec)"
+  local container_name
+  container_name="atomic-prefetch-${PROFILE_NAME:-$profile}-$$"
+  container_name="${container_name//[^a-zA-Z0-9_.-]/-}"
 
   local cmd=(
-    "$CONTAINER_RUNTIME" run --rm
+    "$CONTAINER_RUNTIME" run --detach --rm
+    --name "$container_name"
     "${args[@]}"
     -v "$volume"
   )
@@ -175,8 +247,12 @@ download_one() {
   fi
 
   set +e
-  timeout --foreground "$TIMEOUT_SECONDS" "${cmd[@]}"
+  "${cmd[@]}" >/dev/null
   local status=$?
+  if [[ "$status" == "0" ]]; then
+    wait_for_prefetch "$container_name"
+    status=$?
+  fi
   set -e
 
   case "$status" in

@@ -84,6 +84,8 @@ Default behavior skips rows marked `Downloaded=yes`. Use `--all` when you want t
 
 After each successful prefetch attempt, `download-bench-models.sh` updates the matching manifest row to `Downloaded=yes`. Use `--no-mark` when you want to keep the manifest unchanged.
 
+The installer uses a temporary `llama-server` container as the download mechanism, then stops it automatically once the model reaches `main: model loaded`. It is not meant to leave a benchmark model running.
+
 Suitability on the validated 6GB VRAM / 24GB RAM machine:
 
 | Profile | Fit notes |

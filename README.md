@@ -248,6 +248,8 @@ Download the benchmark list from `MODEL_LIST.md`, skipping rows already marked `
 
 After each successful prefetch attempt, the script changes that row in `MODEL_LIST.md` from `Downloaded=no` to `Downloaded=yes`. Use `--no-mark` if you want a read-only run.
 
+The prefetcher briefly starts a temporary `llama-server` container because the TurboQuant image downloads Hugging Face GGUFs through `llama-server -hf`. It now stops that temporary server automatically as soon as the logs report `main: model loaded`.
+
 Preview the full benchmark list, including already downloaded rows:
 
 ```bash

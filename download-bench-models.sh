@@ -175,6 +175,24 @@ print_disk_note() {
   df -h "$cache" | awk 'NR == 1 || NR == 2 { print "Disk:  " $0 }'
 }
 
+cache_has_model() {
+  local model="$1"
+  local cache="${HF_CACHE:-$HOME/.cache/huggingface}"
+  local repo="${model%%:*}"
+  local quant=""
+  local encoded="${repo//\//--}"
+  local repo_path="$cache/hub/models--$encoded"
+  if [[ "$model" == *:* ]]; then
+    quant="${model#*:}"
+  fi
+  [[ -d "$repo_path/snapshots" ]] || return 1
+  if [[ -n "$quant" ]]; then
+    find -L "$repo_path/snapshots" -type f -iname "*.gguf" -iname "*${quant}*" -print -quit | grep -q .
+  else
+    find -L "$repo_path/snapshots" -type f -iname "*.gguf" -print -quit | grep -q .
+  fi
+}
+
 echo "Atomic Llama Turbo benchmark model downloader"
 echo "Manifest: $MODEL_LIST"
 print_disk_note
@@ -207,6 +225,18 @@ while IFS=, read -r model downloaded; do
   echo "  bench: ./bench-code.sh --profile profiles/$profile.env"
 
   if [[ "$LIST_ONLY" == "1" ]]; then
+    continue
+  fi
+
+  if cache_has_model "$MODEL"; then
+    echo "  cache: already present"
+    if [[ "$DRY_RUN" == "1" && "$MARK_DOWNLOADED" == "1" && "$downloaded" != "yes" ]]; then
+      echo "  manifest: would mark Downloaded=yes"
+    elif [[ "$MARK_DOWNLOADED" == "1" && "$downloaded" != "yes" ]]; then
+      mark_downloaded "$MODEL"
+      echo "  manifest: marked Downloaded=yes"
+    fi
+    echo
     continue
   fi
 
