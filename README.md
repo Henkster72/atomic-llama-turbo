@@ -188,6 +188,10 @@ qwen36-coder-q3.env    candidate lower-memory fallback
 qwen36-coder-27b.env   candidate coding comparison
 gemma4-copy-e4b.env    candidate copywriting / fast assistant
 gemma4-fast-e2b.env    candidate ultra-fast smoke test
+qwopus36-q4.env        Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
+qwopus36-q5.env        Qwen3.6 A3B fine-tune, Q5 stress-test candidate
+caveman-qwen36-q4.env  terse Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
+caveman-qwen36-q5.env  terse Qwen3.6 A3B fine-tune, Q5 stress-test candidate
 ```
 
 Run any profile:
@@ -236,6 +240,18 @@ Download all curated model candidates:
 ./install-models.sh --all
 ```
 
+Download the benchmark list from `MODEL_LIST.md`, skipping rows already marked `Downloaded=yes`:
+
+```bash
+./download-bench-models.sh
+```
+
+Preview the full benchmark list, including already downloaded rows:
+
+```bash
+./download-bench-models.sh --dry-run --all
+```
+
 Preview first:
 
 ```bash
@@ -251,6 +267,8 @@ The curated set is:
 | Gemma 4 E4B | copywriting / fast assistant |
 | Gemma 4 E2B | smoke test / ultra fast |
 | Qwen3.6 27B | coding comparison |
+| Qwopus3.6 35B A3B Q4/Q5 | reasoning/coding fine-tune comparison |
+| caveman-qwen3.6 Q4/Q5 | terse coding fine-tune comparison |
 
 This can consume a lot of disk. The files are cached under `HF_CACHE`, defaulting to `$HOME/.cache/huggingface`.
 

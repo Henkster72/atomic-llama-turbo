@@ -66,6 +66,36 @@ Default installer behavior downloads only the validated Qwen Q4 profile.
 | `gemma4-copy-e4b` | Gemma 4 E4B | copywriting / fast assistant | candidate |
 | `gemma4-fast-e2b` | Gemma 4 E2B | smoke test / ultra fast | candidate |
 | `qwen36-coder-27b` | Qwen3.6 27B | coding comparison | candidate |
+| `qwopus36-q4` | Qwopus3.6-35B-A3B Q4 | reasoning/coding comparison | candidate, same Q4 recipe |
+| `qwopus36-q5` | Qwopus3.6-35B-A3B Q5 | heavier reasoning/coding comparison | stress-test |
+| `caveman-qwen36-q4` | caveman-qwen3.6 Q4 | terse coding comparison | candidate, same Q4 recipe |
+| `caveman-qwen36-q5` | caveman-qwen3.6 Q5 | heavier terse coding comparison | stress-test |
+
+## Benchmark Download List
+
+`MODEL_LIST.md` is a small CSV-style manifest of models selected for local testing. Use the wrapper when you want to fetch that exact list:
+
+```bash
+./download-bench-models.sh --dry-run --all
+./download-bench-models.sh
+```
+
+Default behavior skips rows marked `Downloaded=yes`. Use `--all` when you want the script to include those too.
+
+Suitability on the validated 6GB VRAM / 24GB RAM machine:
+
+| Profile | Fit notes |
+|---|---|
+| `qwen36-coder-q4` | known stable baseline at 131K context |
+| `qwen36-coder-q3` | lower-memory fallback with the same MoE/TurboKV pattern |
+| `qwopus36-q4` | Qwen3.6-35B-A3B derivative, should use the same Q4 recipe |
+| `caveman-qwen36-q4` | Qwen3.6-35B-A3B derivative, should use the same Q4 recipe |
+| `qwopus36-q5` | heavier Q5 test; start at 64K and watch RAM/swap |
+| `caveman-qwen36-q5` | heavier Q5 test; start at 64K and watch RAM/swap |
+| `gemma4-copy-e4b` | smaller non-Qwen profile; no CPU MoE flag |
+| `gemma4-fast-e2b` | smallest non-Qwen smoke test; no CPU MoE flag |
+
+The Q4 Qwen-derived fine-tunes are the closest matches to the original validated recipe. The Q5 fine-tunes are not impossible, but they are likely to spend more time leaning on system RAM and swap on 24GB-class machines.
 
 ### Qwen3.6 27B GGUF
 

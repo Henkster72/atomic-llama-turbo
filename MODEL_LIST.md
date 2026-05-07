@@ -1,0 +1,9 @@
+MODELS,Downloaded
+unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_M,yes
+unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q3_K_XL,no
+unsloth/gemma-4-E4B-it-GGUF:UD-Q4_K_M,no
+unsloth/gemma-4-E2B-it-GGUF:UD-Q4_K_M,no
+Jackrong/Qwopus3.6-35B-A3B-v1-GGUF:Q4_K_M,no
+Jackrong/Qwopus3.6-35B-A3B-v1-GGUF:Q5_K_M,no
+njmason/caveman-qwen3.6-GGUF:Q4_K_M,no
+njmason/caveman-qwen3.6-GGUF:Q5_K_M,no

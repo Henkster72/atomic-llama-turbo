@@ -172,6 +172,7 @@ test-atomic.sh
 chat-atomic.sh
 chat-atomic.py
 install-models.sh
+download-bench-models.sh
 doctor.sh
 recommend-profile.sh
 chat_store.py
@@ -193,6 +194,7 @@ chmod +x "$WORKDIR"/run-atomic.sh \
   "$WORKDIR"/test-atomic.sh \
   "$WORKDIR"/chat-atomic.sh \
   "$WORKDIR"/install-models.sh \
+  "$WORKDIR"/download-bench-models.sh \
   "$WORKDIR"/doctor.sh \
   "$WORKDIR"/recommend-profile.sh \
   "$WORKDIR"/chat-atomic.py \
@@ -272,6 +274,13 @@ All curated candidates:
 "$WORKDIR/install-models.sh" --all
 ```
 
+The exact benchmark manifest in `MODEL_LIST.md`:
+
+```bash
+"$WORKDIR/download-bench-models.sh" --dry-run --all
+"$WORKDIR/download-bench-models.sh"
+```
+
 Preview first:
 
 ```bash
@@ -292,6 +301,10 @@ qwen36-coder-q3     fallback coding candidate
 gemma4-copy-e4b     copywriting / fast assistant candidate
 gemma4-fast-e2b     smoke test / ultra fast candidate
 qwen36-coder-27b    coding comparison candidate
+qwopus36-q4         Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
+qwopus36-q5         Qwen3.6 A3B fine-tune, Q5 stress-test candidate
+caveman-qwen36-q4   terse Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
+caveman-qwen36-q5   terse Qwen3.6 A3B fine-tune, Q5 stress-test candidate
 ```
 
 This can download many GB. Files are cached under:
