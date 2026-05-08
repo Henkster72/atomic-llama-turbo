@@ -8,7 +8,7 @@
 
 Atomic Llama Turbo is a container-first recipe for running and comparing local GGUF models with `llama-server`, CUDA, TurboQuant KV cache, and CPU MoE offload. The current reference machine is a 6GB RTX 2060 Max-Q laptop with 24GB RAM.
 
-The point is not to collect every model. The point is to find a small set of profiles that are actually useful for copywriting, HTML/CSS visuals, and Python coding.
+ALT is for finding practical local LLM profiles that feel useful in real work: writing, rewriting, coding, UI generation, analysis, and other text/code generation tasks. The benchmark set stays small on purpose so each candidate has to earn its place with speed, quality, and sane memory use.
 
 The core question:
 
@@ -46,6 +46,8 @@ Check the machine:
 ```bash
 ./doctor.sh
 ```
+
+The doctor checks Podman/Docker, host NVIDIA/CUDA visibility, and GPU access from inside a container. It stops on missing dependencies and prints short fix advice before you waste time downloading models.
 
 Download/cache the listed Hugging Face models if needed:
 

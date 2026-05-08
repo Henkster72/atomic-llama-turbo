@@ -24,29 +24,34 @@ Other Linux machines can use the same workflow, but model settings should be ret
 ## 1. Check The Host
 
 ```bash
-nvidia-smi
-podman --version
-free -h
-df -h "$HOME"
+./doctor.sh
 ```
 
-If `nvidia-smi` fails on the host, fix the NVIDIA driver first.
+`doctor.sh` is the dependency gate. It checks:
 
-## 2. Check Container GPU Access
+- `python3` and `curl`
+- Podman or Docker
+- host NVIDIA visibility through `nvidia-smi`
+- NVIDIA CDI when using Podman
+- CUDA/NVIDIA access from inside a container
+- RAM, swap, and home disk space
 
-Podman with NVIDIA CDI:
+If a required dependency is missing, the doctor exits non-zero and prints short advice. Fix those blockers before downloading models or starting a server.
+
+Common fixes:
+
+- If `nvidia-smi` fails, fix the NVIDIA driver first. Containers cannot use a GPU the host cannot see.
+- If no runtime is found, install Podman or Docker. On Bazzite/Fedora Atomic systems, prefer Podman.
+- If Podman cannot see the GPU, fix NVIDIA CDI/container-toolkit setup before changing model flags.
+- If Docker cannot see the GPU, install or repair NVIDIA Container Toolkit.
+
+Docker users can set:
 
 ```bash
-podman run --rm \
-  --device nvidia.com/gpu=all \
-  --security-opt=label=disable \
-  docker.io/nvidia/cuda:12.4.1-base-ubuntu22.04 \
-  nvidia-smi
+CONTAINER_RUNTIME=docker ./doctor.sh
 ```
 
-Docker users can use `--gpus all`.
-
-## 3. Build Or Provide The CUDA Image
+## 2. Build Or Provide The CUDA Image
 
 This project expects an image named:
 
@@ -58,7 +63,7 @@ It should contain the TurboQuant-capable `llama-server` binary. The original loc
 
 The host does not need a CUDA toolkit. CUDA lives in the container.
 
-## 4. Download Bench Models
+## 3. Download Bench Models
 
 The current bench models are in `MODEL_LIST.md`.
 
@@ -74,7 +79,7 @@ ollama pull gemma3:1b
 ollama pull gemma3:4b
 ```
 
-## 5. Start A Profile
+## 4. Start A Profile
 
 ```bash
 PROFILE=qwen36-coder-q4 ./run-atomic.sh
@@ -92,7 +97,7 @@ Test:
 ./test-atomic.sh
 ```
 
-## 6. Retune For Another Machine
+## 5. Retune For Another Machine
 
 The checked-in settings are tuned for 6GB VRAM / 24GB RAM. On larger or smaller systems, retune context, GPU layers, K/V cache type, and CPU MoE offload.
 
@@ -116,7 +121,7 @@ Useful tuning principles:
 - prefer plain/q8 KV when the model fits and TurboQuant overhead slows it down
 - keep RAM/swap under control; high swap can make results meaningless
 
-## 7. What Is Ignored
+## 6. What Is Ignored
 
 The following are intentionally not committed:
 
