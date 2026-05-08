@@ -16,6 +16,49 @@ The core question:
 
 You do not need a datacenter GPU. You need the right cursed incantation of llama.cpp flags. :-)
 
+## The Trick
+
+Without a plan, a big model tries to squeeze through the tiny VRAM door and falls over. Atomic Llama Turbo treats VRAM and system RAM as one deliberately balanced workspace: hot GPU layers and compressed TurboQuant KV cache stay on the NVIDIA card, while CPU MoE offload parks the bulkier expert weights in system RAM.
+
+That does not turn a 6GB card into a 4090. It does give the machine a sane layout, which is where the useful speed comes from.
+
+```mermaid
+flowchart LR
+  subgraph before["Before: cram the model into the GPU"]
+    direction TB
+    bmodel["Big GGUF model<br/>wants more memory than VRAM"]
+    bvram["VRAM 6GB<br/>██████████<br/>over capacity"]
+    bram["RAM 24GB<br/>██░░░░░░░░░░░░░░░░░░░░░░<br/>not used intelligently"]
+    bfail["❌ does not load<br/><s>useful local inference</s>"]
+    bmodel --> bvram
+    bmodel -. poor split .-> bram
+    bvram --> bfail
+  end
+
+  subgraph after["After: Atomic Llama Turbo layout"]
+    direction TB
+    amodel["Same useful model profile"]
+    avram["VRAM 6GB<br/>GPU layers + TurboQuant KV<br/>█████░"]
+    aram["RAM 24GB<br/>CPU MoE expert weights + host buffers<br/>██████████████████░░░░░░"]
+    speed["Fastest stable split for this machine<br/>less VRAM pressure, useful tok/s"]
+    amodel --> avram
+    amodel --> aram
+    avram --> speed
+    aram --> speed
+  end
+
+  before --> after
+
+  classDef hot fill:#4a1518,stroke:#ff5c67,color:#ffd7dc,stroke-width:2px;
+  classDef cool fill:#16241f,stroke:#44d3a4,color:#dff7ee,stroke-width:2px;
+  classDef fail fill:#2a1114,stroke:#ff5c67,color:#ffd7dc,stroke-width:2px;
+  class bvram hot;
+  class avram,aram,speed cool;
+  class bfail fail;
+```
+
+Idea spark: https://www.youtube.com/watch?v=8F_5pdcD3HY
+
 ## Current Bench Set
 
 These are the maintained benchmark choices in `MODEL_LIST.md`:
