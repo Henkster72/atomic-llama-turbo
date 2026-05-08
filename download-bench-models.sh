@@ -162,7 +162,7 @@ fit_note() {
   local profile="$1"
   case "$profile" in
     qwen36-coder-q4)
-      echo "gold ATL baseline on 6GB VRAM / 24GB RAM: Q4, 131K, TurboKV, CPU MoE 36"
+      echo "gold ALT baseline on 6GB VRAM / 24GB RAM: Q4, 131K, TurboKV, CPU MoE 36"
       ;;
     gemma4-26b-a4b-q4)
       echo "HTML/CSS contender: 64K, turbo3/turbo3, CPU MoE 32 on the reference laptop"

@@ -1,6 +1,6 @@
 # Benchmarks
 
-ATL benchmarks practical usefulness, not leaderboard status.
+ALT benchmarks practical usefulness, not leaderboard status.
 
 The core question:
 

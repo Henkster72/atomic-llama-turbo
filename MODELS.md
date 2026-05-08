@@ -53,4 +53,4 @@ The broader test matrix was useful, but several models were removed from the act
 - Qwopus/Caveman Qwen3.6 derivatives
 - older Gemma E2B/E4B HF experiments
 
-They can be re-added later, but they should not distract from the current ATL bench set.
+They can be re-added later, but they should not distract from the current ALT bench set.

@@ -30,7 +30,7 @@ Usage:
   ./install-models.sh --dry-run --all  show what would be downloaded
 
 Profiles:
-  qwen36-coder-q4              Qwen3.6-35B-A3B Q4, gold ATL baseline
+  qwen36-coder-q4              Qwen3.6-35B-A3B Q4, gold ALT baseline
   gemma4-26b-a4b-q4            Gemma 4 26B-A4B Q4, HTML/CSS contender
   qwen3-30b-a3b-2507-q4xl      Qwen3 30B-A3B 2507 Q4XL, Qwen challenger
 
