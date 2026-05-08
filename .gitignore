@@ -17,6 +17,13 @@ __pycache__/
 
 # Generated benchmark output
 bench/results/
+MODEL_LIST.csv
+
+# Local quality/benchmark prompts and generated artifacts
+quality-bench/prompts/
+quality-bench/results/
+quality-bench/tmp-profiles/
+quality-bench/tuning/
 
 # Personal/local chat archive
 chats/

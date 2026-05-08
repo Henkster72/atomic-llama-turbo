@@ -2,12 +2,21 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/.env"
+  set +a
+fi
+
 HF_CACHE="${HF_CACHE:-$HOME/.cache/huggingface}"
 IMAGE="${IMAGE:-llama-turboquant-cuda}"
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-podman}"
 TIMEOUT_SECONDS="${TIMEOUT_SECONDS:-7200}"
 PREFETCH_PORT="${PREFETCH_PORT:-18080}"
 PREFETCH_POLL_SECONDS="${PREFETCH_POLL_SECONDS:-5}"
+DOWNLOAD_METHOD="${DOWNLOAD_METHOD:-auto}"
 
 usage() {
   cat <<'EOF'
@@ -21,15 +30,9 @@ Usage:
   ./install-models.sh --dry-run --all  show what would be downloaded
 
 Profiles:
-  qwen36-coder-q4     Qwen3.6-35B-A3B Q4, main coding, validated
-  qwen36-coder-q3     Qwen3.6-35B-A3B Q3, fallback coding candidate
-  gemma4-copy-e4b     Gemma 4 E4B Q4, copywriting / fast assistant candidate
-  gemma4-fast-e2b     Gemma 4 E2B Q4, smoke test / ultra fast candidate
-  qwen36-coder-27b    Qwen3.6 27B Q4, coding comparison candidate
-  qwopus36-q4         Qwopus3.6-35B-A3B Q4, same-recipe candidate
-  qwopus36-q5         Qwopus3.6-35B-A3B Q5, stress-test candidate
-  caveman-qwen36-q4   caveman-qwen3.6 Q4, terse same-recipe candidate
-  caveman-qwen36-q5   caveman-qwen3.6 Q5, terse stress-test candidate
+  qwen36-coder-q4              Qwen3.6-35B-A3B Q4, gold ATL baseline
+  gemma4-26b-a4b-q4            Gemma 4 26B-A4B Q4, HTML/CSS contender
+  qwen3-30b-a3b-2507-q4xl      Qwen3 30B-A3B 2507 Q4XL, Qwen challenger
 
 Environment:
   HF_CACHE            host Hugging Face cache, default $HOME/.cache/huggingface
@@ -37,6 +40,7 @@ Environment:
   CONTAINER_RUNTIME   podman or docker, default podman
   TIMEOUT_SECONDS     timeout per model server prefetch attempt, default 7200
   PREFETCH_POLL_SECONDS  seconds between temporary server log checks, default 5
+  DOWNLOAD_METHOD     auto, hf, or server; default auto
   HF_TOKEN            optional Hugging Face token
   PREFETCH_PORT       temporary container server port, default 18080
 EOF
@@ -148,6 +152,53 @@ cache_has_model() {
   fi
 }
 
+hf_download_command() {
+  local model="$1"
+  local repo="${model%%:*}"
+  local include="*.gguf"
+  if [[ "$model" == *:* ]]; then
+    include="*${model#*:}*.gguf"
+  fi
+
+  local cmd=(uvx --from huggingface_hub hf download "$repo" --include "$include" --exclude "mmproj*" --cache-dir "$HF_CACHE/hub")
+  printf '%s\0' "${cmd[@]}"
+}
+
+download_with_hf_cli() {
+  local model="$1"
+  local cmd=()
+  if ! command -v uv >/dev/null 2>&1; then
+    return 127
+  fi
+
+  mapfile -d '' -t cmd < <(hf_download_command "$model")
+  if [[ "$dry_run" == "1" ]]; then
+    local redacted=()
+    local hide_next=0
+    local part
+    for part in "${cmd[@]}"; do
+      if [[ "$hide_next" == "1" ]]; then
+        redacted+=("********")
+        hide_next=0
+        continue
+      fi
+      if [[ "$part" == "--token" ]]; then
+        redacted+=("$part")
+        hide_next=1
+        continue
+      fi
+      redacted+=("$part")
+    done
+    printf '    '
+    printf '%q ' "${redacted[@]}"
+    printf '\n'
+    return 0
+  fi
+
+  "${cmd[@]}"
+  cache_has_model "$model"
+}
+
 stop_prefetch_container() {
   local name="$1"
   "$CONTAINER_RUNTIME" stop "$name" >/dev/null 2>&1 || true
@@ -207,6 +258,38 @@ download_one() {
     echo "    already present in cache"
     return 0
   fi
+
+  case "$DOWNLOAD_METHOD" in
+    auto|hf)
+      set +e
+      download_with_hf_cli "$MODEL"
+      local hf_status=$?
+      set -e
+      if [[ "$hf_status" == "0" ]]; then
+        if [[ "$dry_run" == "1" ]]; then
+          echo "    would download with huggingface_hub"
+        else
+          echo "    downloaded with huggingface_hub"
+        fi
+        return 0
+      fi
+      if [[ "$DOWNLOAD_METHOD" == "hf" ]]; then
+        echo "    huggingface_hub download failed or uv is unavailable" >&2
+        return 1
+      fi
+      if [[ "$hf_status" != "127" ]]; then
+        echo "    huggingface_hub download failed; not falling back to server prefetch" >&2
+        return "$hf_status"
+      fi
+      echo "    huggingface_hub unavailable or failed; falling back to temporary llama-server prefetch" >&2
+      ;;
+    server)
+      ;;
+    *)
+      echo "Unknown DOWNLOAD_METHOD: $DOWNLOAD_METHOD" >&2
+      return 2
+      ;;
+  esac
 
   local args=()
   mapfile -t args < <(runtime_args)

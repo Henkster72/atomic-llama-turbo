@@ -2,6 +2,14 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ -f "$SCRIPT_DIR/.env" ]]; then
+  set -a
+  # shellcheck source=/dev/null
+  source "$SCRIPT_DIR/.env"
+  set +a
+fi
+
 MODEL_LIST="${MODEL_LIST:-$SCRIPT_DIR/MODEL_LIST.md}"
 INSTALLER="${INSTALLER:-$SCRIPT_DIR/install-models.sh}"
 INCLUDE_DOWNLOADED=0
@@ -25,6 +33,7 @@ Environment:
   HF_CACHE            Hugging Face cache, default inherited by install-models.sh
   CONTAINER_RUNTIME   podman or docker, default inherited by install-models.sh
   IMAGE               llama-server container image, default inherited by install-models.sh
+  DOWNLOAD_METHOD     auto, hf, or server; default inherited by install-models.sh
 EOF
 }
 
@@ -71,6 +80,8 @@ if [[ ! -x "$INSTALLER" ]]; then
   exit 1
 fi
 
+"$SCRIPT_DIR/materialize-model-list-profiles.sh" --include-not-downloaded >/dev/null
+
 model_rows() {
   awk -F, '
     NR == 1 { next }
@@ -85,26 +96,34 @@ model_rows() {
 profile_for_model() {
   local model="$1"
   local profile
-  for profile in "$SCRIPT_DIR"/profiles/*.env; do
+  for profile in "$SCRIPT_DIR"/quality-bench/tmp-profiles/model-list/*.env "$SCRIPT_DIR"/profiles/*.env; do
     [[ -f "$profile" ]] || continue
-    (
+    if (
       PROFILE_NAME=
       MODEL=
       # shellcheck source=/dev/null
       source "$profile"
-      if [[ "$MODEL" == "$model" ]]; then
-        printf '%s\n' "${PROFILE_NAME:-$(basename "$profile" .env)}"
-      fi
-    )
-  done | head -n 1
+      [[ "$MODEL" == "$model" ]]
+    ); then
+      printf '%s\n' "$profile"
+      return 0
+    fi
+  done
+  return 1
 }
 
 load_profile() {
   local profile_name="$1"
-  local path="$SCRIPT_DIR/profiles/$profile_name.env"
+  local path="$profile_name"
   if [[ ! -f "$path" ]]; then
-    echo "Profile not found for $profile_name" >&2
-    return 1
+    if [[ -f "$SCRIPT_DIR/quality-bench/tmp-profiles/model-list/$profile_name.env" ]]; then
+      path="$SCRIPT_DIR/quality-bench/tmp-profiles/model-list/$profile_name.env"
+    elif [[ -f "$SCRIPT_DIR/profiles/$profile_name.env" ]]; then
+      path="$SCRIPT_DIR/profiles/$profile_name.env"
+    else
+      echo "Profile not found for $profile_name" >&2
+      return 1
+    fi
   fi
   PROFILE_NAME=
   PROFILE_ROLE=
@@ -119,48 +138,37 @@ load_profile() {
 
 mark_downloaded() {
   local model="$1"
-  local tmp
-  tmp="$(mktemp)"
-  awk -F, -v target="$model" '
-    BEGIN { OFS = "," }
-    NR == 1 { print; next }
-    {
-      left = $1
-      right = $2
-      gsub(/^[[:space:]]+|[[:space:]]+$/, "", left)
-      if (left == target) {
-        print $1, "yes"
-      } else {
-        print
-      }
-    }
-  ' "$MODEL_LIST" > "$tmp"
-  mv "$tmp" "$MODEL_LIST"
+  python3 - "$MODEL_LIST" "$model" <<'PY'
+import csv
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+target = sys.argv[2]
+with path.open(newline="", encoding="utf-8") as handle:
+    rows = list(csv.DictReader(handle))
+fields = rows[0].keys() if rows else []
+for row in rows:
+    if row.get("MODELS") == target:
+        row["Downloaded"] = "yes"
+with path.open("w", newline="", encoding="utf-8") as handle:
+    writer = csv.DictWriter(handle, fieldnames=fields, lineterminator="\n")
+    writer.writeheader()
+    writer.writerows(rows)
+PY
 }
 
 fit_note() {
   local profile="$1"
   case "$profile" in
     qwen36-coder-q4)
-      echo "validated baseline on 6GB VRAM / 24GB RAM: Q4, 131K, TurboKV, CPU MoE 36"
+      echo "gold ATL baseline on 6GB VRAM / 24GB RAM: Q4, 131K, TurboKV, CPU MoE 36"
       ;;
-    qwen36-coder-q3)
-      echo "same Qwen MoE recipe with lower quant pressure: good fallback if Q4 is tight"
+    gemma4-26b-a4b-q4)
+      echo "HTML/CSS contender: 64K, turbo3/turbo3, CPU MoE 32 on the reference laptop"
       ;;
-    qwopus36-q4|caveman-qwen36-q4)
-      echo "Qwen3.6-35B-A3B derivative: should use the same Q4 small-VRAM recipe as the baseline"
-      ;;
-    qwopus36-q5|caveman-qwen36-q5)
-      echo "Qwen3.6-35B-A3B derivative but Q5: downloadable, test at 64K first, expect RAM/swap pressure on 24GB systems"
-      ;;
-    gemma4-copy-e4b)
-      echo "smaller Gemma profile: no CPU MoE flag, useful for fast copywriting and compatibility tests"
-      ;;
-    gemma4-fast-e2b)
-      echo "smallest Gemma profile: no CPU MoE flag, good smoke test / quick assistant"
-      ;;
-    qwen36-coder-27b)
-      echo "coding comparison candidate: no CPU MoE flag in this profile; watch RAM at high context"
+    qwen3-30b-a3b-2507-q4xl)
+      echo "Qwen challenger: 131K, turbo4/turbo3, CPU MoE 44 on the reference laptop"
       ;;
     *)
       echo "candidate profile: verify load, context, RAM/VRAM, and answer quality before treating as stable"
@@ -200,6 +208,12 @@ echo
 
 selected=0
 while IFS=, read -r model downloaded; do
+  if [[ "$model" == ollama:* ]]; then
+    echo "skip: $model"
+    echo "      Ollama comparison model; manage with ollama pull/run, not Hugging Face download"
+    continue
+  fi
+
   profile="$(profile_for_model "$model")"
   if [[ -z "$profile" ]]; then
     echo "!! No profile maps to: $model" >&2
@@ -220,9 +234,9 @@ while IFS=, read -r model downloaded; do
   echo "model: $profile"
   echo "  repo:  $MODEL"
   echo "  role:  ${PROFILE_ROLE:-unknown}"
-  echo "  fit:   $(fit_note "$profile")"
+  echo "  fit:   $(fit_note "${PROFILE_NAME:-$(basename "$profile" .env)}")"
   echo "  run:   PROFILE=$profile ./run-atomic.sh"
-  echo "  bench: ./bench-code.sh --profile profiles/$profile.env"
+  echo "  bench: ./run-quality-bench.sh --profiles ${PROFILE_NAME:-$(basename "$profile" .env)}"
 
   if [[ "$LIST_ONLY" == "1" ]]; then
     continue

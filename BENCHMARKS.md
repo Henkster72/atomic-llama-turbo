@@ -1,106 +1,73 @@
 # Benchmarks
 
-Atomic Llama Turbo benchmarks practical work, not leaderboard trophies.
+ATL benchmarks practical usefulness, not leaderboard status.
 
-The goal is to answer:
+The core question:
 
 ```text
-On this machine, with this profile, is the model useful for coding or copywriting?
+On this machine, with this profile, is the model fast enough and good enough for real local work?
 ```
 
-## What Gets Measured
+## Tasks
+
+Current quality runs focus on:
+
+- copywriting
+- Python logic/helpers
+- single-file HTML/CSS visual concepts
+
+Use smoke first:
+
+```bash
+./run-quality-bench.sh --stage smoke --profiles qwen36-coder-q4 gemma4-26b-a4b-q4 qwen3-30b-a3b-2507-q4xl
+```
+
+Run the full set only after smoke results are worth the time:
+
+```bash
+./run-quality-bench.sh --stage full --profiles qwen36-coder-q4 gemma4-26b-a4b-q4 qwen3-30b-a3b-2507-q4xl
+```
+
+For Ollama comparison models:
+
+```bash
+python3 ./run-mixed-naomi-bench.py
+```
+
+## Metrics
+
+Each run records:
 
 - elapsed seconds
 - prompt tokens/sec
 - generation tokens/sec
-- prompt tokens
-- completion tokens
-- VRAM before/after
-- RAM/swap before/after
-- profile settings
-- model and quant
-- human score placeholder
+- prompt/completion token counts
+- VRAM/RAM/swap snapshots
+- model/profile settings
+- output file names
 
-## Copywriting Tasks
-
-Prompts live in:
+Outputs live in:
 
 ```text
-bench/prompts/copy/
+quality-bench/results/
 ```
 
-Current tasks:
+That folder is ignored by git. Keep summarized findings in Markdown, not raw generated artifacts.
 
-- homepage hero rewrite
-- service page rewrite
-- SEO titles/meta descriptions
-
-Run:
-
-```bash
-./bench-copy.sh --profile profiles/qwen36-coder-q4.env
-```
-
-## Coding Tasks
-
-Prompts live in:
-
-```text
-bench/prompts/code/
-```
-
-Current tasks:
-
-- Bash script
-- PHP bugfix
-- JavaScript refactor
-- Jinja explanation/rewrite
-
-Run:
-
-```bash
-./bench-code.sh --profile profiles/qwen36-coder-q4.env
-```
-
-## Output
-
-Each run writes:
-
-```text
-bench/results/<kind>-<profile>-YYYYMMDD-HHMMSS.jsonl
-bench/results/<kind>-<profile>-YYYYMMDD-HHMMSS.md
-```
-
-The JSONL is for later analysis. The Markdown is for quick reading.
-
-## Suggested Human Scoring
+## Human Quality Scoring
 
 Use a simple 1-5 score:
 
 ```text
-1 = wrong or unusable
-2 = partially useful, needs heavy repair
+1 = unusable
+2 = mostly wrong or generic
 3 = usable with edits
 4 = good
 5 = strong, near-ready
 ```
 
-For coding, score:
+Score copy for clarity, specificity, tone, and commercial usefulness.
 
-- correctness
-- instruction following
-- runnable code
-- restraint, no over-engineering
+Score code for correctness, restraint, readability, and whether it runs.
 
-For copywriting, score:
-
-- clarity
-- tone fit
-- specificity
-- usefulness without major rewriting
-
-## Why Practical Benchmarks
-
-Formal benchmarks are useful, but they do not answer whether a profile is pleasant on a 6GB/8GB/12GB card. These tasks are intentionally ordinary: small scripts, PHP bugs, page copy, SEO snippets, and refactors.
-
-That is the use case.
+Score HTML/CSS for visual hierarchy, brand fit, browser usability, responsiveness, and whether the design is more than generic cards.

@@ -4,134 +4,32 @@
   <img src="static/atomic-llama-turbo.svg" alt="Atomic Llama Turbo" width="180">
 </p>
 
-**Big local models. Small GPU. Fast local inference. No CUDA mess.**
+**Useful local LLMs on modest NVIDIA hardware. Fast inference, practical quality, no host CUDA mess.**
 
-_A reproducible small-VRAM recipe for running useful copywriting + coding models locally with TurboQuant KV cache, Unsloth GGUFs, CPU MoE offload, and clean containerized CUDA._
+Atomic Llama Turbo is a container-first recipe for running and comparing local GGUF models with `llama-server`, CUDA, TurboQuant KV cache, and CPU MoE offload. The current reference machine is a 6GB RTX 2060 Max-Q laptop with 24GB RAM.
 
-Atomic Llama Turbo is a launch and benchmark kit for running local coding and copywriting models on Linux without installing CUDA on the host. It focuses on:
+The point is not to collect every model. The point is to find a small set of profiles that are actually useful for copywriting, HTML/CSS visuals, and Python coding.
 
-- TurboQuant KV cache
-- Unsloth GGUF models
-- CUDA-enabled `llama-server`
-- CPU MoE offload where it helps
-- profile-driven startup commands
-- repeatable copywriting and coding benchmarks
-- clean Markdown/JSON chat transcripts
+## Current Bench Set
 
-If you have a modest NVIDIA card and enough system RAM, this project helps you find the highest-context, most useful local model profile before wasting your weekend on random flags.
+These are the maintained benchmark choices in `MODEL_LIST.md`:
 
-## The Trick
+| Profile | Backend | Role | Reference settings |
+|---|---|---|---|
+| `qwen36-coder-q4` | llama.cpp | gold quality baseline | 131K ctx, `turbo4/turbo3`, `--n-cpu-moe 36` |
+| `gemma4-26b-a4b-q4` | llama.cpp | best HTML/CSS contender | 64K ctx, `turbo3/turbo3`, `--n-cpu-moe 32` |
+| `qwen3-30b-a3b-2507-q4xl` | llama.cpp | Qwen challenger | 131K ctx, `turbo4/turbo3`, `--n-cpu-moe 44` |
+| `ollama-gemma3-1b` | Ollama | tiny speed control | managed by Ollama |
+| `ollama-gemma3-4b` | Ollama | small speed/quality control | managed by Ollama |
 
-Without a plan, a big model tries to squeeze through the tiny VRAM door and falls over. Atomic Llama Turbo treats VRAM and system RAM as one deliberately balanced workspace: hot GPU layers and compressed TurboQuant KV cache stay on the NVIDIA card, while CPU MoE offload parks the bulkier expert weights in system RAM.
+Observed on the reference machine:
 
-That does not turn a 6GB card into a 4090. It does give the machine a sane layout, which is where the useful speed comes from.
+- Qwen3.6 35B A3B Q4 is still the best serious baseline: roughly 23-25 tok/s on clean copy/Python runs and 8-11 tok/s on long HTML/CSS generations.
+- Gemma 4 26B-A4B loaded cleanly and gave about 15.5 tok/s on smoke testing, with strong observed HTML/CSS quality.
+- Qwen3 30B A3B 2507 is slower than the Qwen3.6 baseline, but remains useful as a quality challenger.
+- Ollama Gemma 1B/4B are speed controls, not replacements for the larger quality models.
 
-```mermaid
-flowchart LR
-  subgraph before["Before: cram the model into the GPU"]
-    direction TB
-    bmodel["Big GGUF model<br/>wants more memory than VRAM"]
-    bvram["VRAM 6GB<br/>██████████<br/>over capacity"]
-    bram["RAM 24GB<br/>██░░░░░░░░░░░░░░░░░░░░░░<br/>not used intelligently"]
-    bfail["❌ does not load<br/><s>useful local inference</s>"]
-    bmodel --> bvram
-    bmodel -. poor split .-> bram
-    bvram --> bfail
-  end
-
-  subgraph after["After: Atomic Llama Turbo layout"]
-    direction TB
-    amodel["Same useful model profile"]
-    avram["VRAM 6GB<br/>GPU layers + TurboQuant KV<br/>█████░"]
-    aram["RAM 24GB<br/>CPU MoE expert weights + host buffers<br/>██████████████████░░░░░░"]
-    speed["Fastest stable split for this machine<br/>less VRAM pressure, useful tok/s"]
-    amodel --> avram
-    amodel --> aram
-    avram --> speed
-    aram --> speed
-  end
-
-  before --> after
-
-  classDef hot fill:#4a1518,stroke:#ff5c67,color:#ffd7dc,stroke-width:2px;
-  classDef cool fill:#16241f,stroke:#44d3a4,color:#dff7ee,stroke-width:2px;
-  classDef fail fill:#2a1114,stroke:#ff5c67,color:#ffd7dc,stroke-width:2px;
-  class bvram hot;
-  class avram,aram,speed cool;
-  class bfail fail;
-```
-
-Idea spark: https://www.youtube.com/watch?v=8F_5pdcD3HY
-
-## Fastest Path
-
-From the project folder:
-
-```bash
-./doctor.sh
-```
-
-```bash
-./recommend-profile.sh
-```
-
-Download the recommended model. Example for the validated 6GB/24GB-class profile:
-
-```bash
-./install-models.sh --profile qwen36-coder-q4
-```
-
-Start the server:
-
-```bash
-PROFILE=qwen36-coder-q4 ./run-atomic.sh
-```
-
-In another terminal, test it:
-
-```bash
-./test-atomic.sh
-```
-
-Chat in the console:
-
-```bash
-./chat-atomic.sh
-```
-
-Optional web chat:
-
-```bash
-./atomic-chat-web.sh
-```
-
-Then open:
-
-```text
-http://127.0.0.1:8090/
-```
-
-## What This Is
-
-Not another giant local AI dashboard.
-
-This is a practical recipe collection:
-
-- **Coding assistant profiles**
-- **Copywriting / rewriting profiles**
-- **Long-context profiles**
-- **Small-VRAM survival profiles**
-- **Known-good commands**
-- **Failure notes**
-- **Benchmark results**
-
-The first validated hook is strong: Qwen3.6-35B-A3B Q4 at 131K context on a 6 GiB RTX 2060 Max-Q, using TurboQuant KV cache and CPU MoE offload.
-
-## Project Pitch
-
-```text
-Atomic Llama Turbo is a small-VRAM benchmarking and launch recipe for running useful local coding and copywriting LLMs on Linux without installing CUDA on the host. It focuses on TurboQuant KV cache, Unsloth GGUF models, llama.cpp server, and reproducible profiles for 6GB/8GB/12GB NVIDIA cards.
-```
+Raw benchmark outputs, prompts, chats, model cache, and generated temp profiles are intentionally ignored by git.
 
 ## Quick Start
 
@@ -139,264 +37,84 @@ Check the machine:
 
 ```bash
 ./doctor.sh
-./recommend-profile.sh
 ```
 
-Start the validated Qwen coding profile:
+Download/cache the listed Hugging Face models if needed:
+
+```bash
+./download-bench-models.sh --dry-run
+./download-bench-models.sh
+```
+
+Start the validated Qwen profile:
 
 ```bash
 PROFILE=qwen36-coder-q4 ./run-atomic.sh
 ```
 
-Smoke test:
+In another terminal:
 
 ```bash
-PROFILE=qwen36-coder-q4 ./test-atomic.sh
-```
-
-Console chat:
-
-```bash
+./test-atomic.sh
 ./chat-atomic.sh
 ```
 
-Integrated web chat:
+For managed server switching:
 
 ```bash
-./atomic-chat-web.sh
+./atomic-server.sh switch qwen36-coder-q4
+./atomic-server.sh status
+./atomic-server.sh stop
 ```
 
-Raw OpenAI-compatible API:
+## Benchmark
 
-```text
-http://127.0.0.1:8080/v1
-```
-
-Integrated chat UI:
-
-```text
-http://127.0.0.1:8090/
-```
-
-## Profiles
-
-Profiles live in [profiles/](profiles/):
-
-```text
-qwen36-coder-q4.env    validated 6GB coding profile
-qwen36-coder-q3.env    candidate lower-memory fallback
-qwen36-coder-27b.env   candidate coding comparison
-gemma4-copy-e4b.env    candidate copywriting / fast assistant
-gemma4-fast-e2b.env    candidate ultra-fast smoke test
-qwopus36-q4.env        Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
-qwopus36-q5.env        Qwen3.6 A3B fine-tune, Q5 stress-test candidate
-caveman-qwen36-q4.env  terse Qwen3.6 A3B fine-tune, Q4 same-recipe candidate
-caveman-qwen36-q5.env  terse Qwen3.6 A3B fine-tune, Q5 stress-test candidate
-```
-
-Run any profile:
+Smoke test the llama.cpp bench set:
 
 ```bash
-PROFILE=profiles/gemma4-copy-e4b.env ./run-atomic.sh
+./run-quality-bench.sh --stage smoke --profiles qwen36-coder-q4 gemma4-26b-a4b-q4 qwen3-30b-a3b-2507-q4xl
 ```
 
-or:
+Full copy/Python/HTML test:
 
 ```bash
-PROFILE=gemma4-copy-e4b ./run-atomic.sh
+./run-quality-bench.sh --stage full --profiles qwen36-coder-q4 gemma4-26b-a4b-q4 qwen3-30b-a3b-2507-q4xl
 ```
 
-The launcher only adds `--n-cpu-moe` when `N_CPU_MOE` is non-empty, so dense/non-MoE candidates are not forced through a Qwen-specific flag.
-
-## Machine Recommendation
-
-`doctor.sh` checks whether the machine can run the recipe:
+Mixed Ollama + llama.cpp comparison:
 
 ```bash
-./doctor.sh
+python3 ./run-mixed-naomi-bench.py
 ```
 
-It reports OS, runtime, host GPU, RAM/swap, disk, NVIDIA CDI where relevant, and container GPU access.
+Benchmark results are written under `quality-bench/results/` and are not committed.
 
-`recommend-profile.sh` suggests a conservative starting profile:
+## Retuning On Another Machine
+
+The checked-in parameters are a known-good starting point for 6GB VRAM / 24GB RAM. Other systems should retune.
+
+Practical rules:
+
+- If a model already fits comfortably, try `q8_0/q8_0` KV before TurboQuant; compressed KV can be overhead.
+- If long context causes VRAM OOM, lower context first, then use `turbo4/turbo4` or `turbo4/turbo3`.
+- MoE models are usually better small-VRAM candidates than dense models because CPU expert offload can help.
+- Dense models with partial GPU offload can become very slow on 6GB cards.
+- Keep one gold baseline and make every new candidate justify itself by speed, quality, or lower RAM/swap.
+
+Regenerate local env profiles from the manifest:
 
 ```bash
-./recommend-profile.sh
+./materialize-model-list-profiles.sh
 ```
 
-It does not install drivers, rewrite system config, or promise the mathematically perfect setup. It gives a sane first profile for the detected VRAM/RAM class.
+## What This Project Is
 
-## Model Prefetch
+Atomic Llama Turbo is a small-VRAM benchmark and launch recipe for useful local LLM work:
 
-Download only the validated Qwen Q4 profile:
+- copywriting that is good enough to edit, not throw away
+- HTML/CSS visual concepts that can be reviewed in a browser
+- Python helpers that are readable and runnable
+- repeatable model/profile comparisons
+- clean containerized CUDA instead of host package clutter
 
-```bash
-./install-models.sh
-```
-
-Download all curated model candidates:
-
-```bash
-./install-models.sh --all
-```
-
-Download the benchmark list from `MODEL_LIST.md`, skipping rows already marked `Downloaded=yes`:
-
-```bash
-./download-bench-models.sh
-```
-
-After each successful prefetch attempt, the script changes that row in `MODEL_LIST.md` from `Downloaded=no` to `Downloaded=yes`. Use `--no-mark` if you want a read-only run.
-
-The prefetcher briefly starts a temporary `llama-server` container because the TurboQuant image downloads Hugging Face GGUFs through `llama-server -hf`. It now stops that temporary server automatically as soon as the logs report `main: model loaded`.
-
-Preview the full benchmark list, including already downloaded rows:
-
-```bash
-./download-bench-models.sh --dry-run --all
-```
-
-Preview first:
-
-```bash
-./install-models.sh --dry-run --all
-```
-
-The curated set is:
-
-| Model | Role |
-|---|---|
-| Qwen3.6-35B-A3B Q4 | main coding |
-| Qwen3.6-35B-A3B Q3 | fallback coding |
-| Gemma 4 E4B | copywriting / fast assistant |
-| Gemma 4 E2B | smoke test / ultra fast |
-| Qwen3.6 27B | coding comparison |
-| Qwopus3.6 35B A3B Q4/Q5 | reasoning/coding fine-tune comparison |
-| caveman-qwen3.6 Q4/Q5 | terse coding fine-tune comparison |
-
-This can consume a lot of disk. The files are cached under `HF_CACHE`, defaulting to `$HOME/.cache/huggingface`.
-
-## Validated Baseline
-
-Validated machine:
-
-```text
-OS: Bazzite / Fedora Atomic style host
-GPU: NVIDIA RTX 2060 Max-Q, 6 GiB VRAM
-RAM: 24 GiB class system memory
-Runtime: Podman with NVIDIA CDI
-```
-
-Stable profile:
-
-```text
-Profile: qwen36-coder-q4
-Model: unsloth/Qwen3.6-35B-A3B-GGUF:UD-Q4_K_M
-Context: 131072
-KV cache: K=turbo4, V=turbo3
-CPU MoE offload: 36
-Text only: --no-mmproj
-Reasoning: off
-```
-
-Observed:
-
-```text
-VRAM total used by server: about 5.3 GiB
-CUDA model buffer: about 3845 MiB
-TurboKV + recurrent state + compute: about 1334 MiB
-Host model buffer: about 17253 MiB
-Short generation: low-to-mid 20 tok/s
-```
-
-Known failure:
-
-```text
-Q4 at 262K context did not fit on the validated 6 GiB GPU.
-```
-
-## Benchmarks
-
-Run practical copywriting tasks:
-
-```bash
-./bench-copy.sh --profile profiles/qwen36-coder-q4.env
-```
-
-Run practical coding tasks:
-
-```bash
-./bench-code.sh --profile profiles/qwen36-coder-q4.env
-```
-
-Results are written to:
-
-```text
-bench/results/*.jsonl
-bench/results/*.md
-```
-
-Human summary lives in [RESULTS.md](RESULTS.md).
-
-The benchmarks are deliberately practical, not leaderboard cosplay. They measure prompt speed, generation speed, elapsed time, RAM/VRAM, and leave room for human scoring.
-
-## Chat Archive
-
-`llama-server` itself is not the diary. The Atomic Llama Turbo clients are.
-
-New chats are saved as:
-
-```text
-chats/YYYYMMDD-HHMMSS.json
-chats/YYYYMMDD-HHMMSS.md
-```
-
-The JSON is for reopening and continuing chats. The Markdown is for reading, grepping, sharing, or turning into notes.
-
-Console commands:
-
-```text
-/chats         list saved console and web chats
-/open ID       reopen a JSON-backed chat
-/where         show Markdown path
-/status        show server/model/GPU/RAM
-/web QUESTION  lightweight web lookup, then ask the model
-```
-
-## Tailnet Use
-
-Tailnet-only model API:
-
-```bash
-tailscale serve --bg --https=8080 http://127.0.0.1:8080
-```
-
-Tailnet-only web chat:
-
-```bash
-tailscale serve --bg --https=8090 http://127.0.0.1:8090
-```
-
-Then:
-
-```text
-https://bazzite.smelt-sun.ts.net:8080/v1
-https://bazzite.smelt-sun.ts.net:8090/
-```
-
-## Documentation Map
-
-- [DEPENDENCIES.md](DEPENDENCIES.md): host/runtime prerequisites
-- [SETUP.md](SETUP.md): generic Podman/Docker setup
-- [MODELS.md](MODELS.md): profiles and candidate model roles
-- [BENCHMARKS.md](BENCHMARKS.md): practical copy/code benchmark method
-- [RESULTS.md](RESULTS.md): stable/failing profile matrix
-- [WHY.md](WHY.md): rationale and tuning logic
-
-## Pointers
-
-- TurboQuant llama.cpp fork: https://github.com/TheTom/llama-cpp-turboquant
-- Qwen3.6 35B A3B GGUF: https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF
-- Qwen3.6 release notes: https://qwen.ai/blog?id=qwen3.6-35b-a3b
-- Gemma 4 GGUF candidates: https://huggingface.co/collections/unsloth/gemma-4
-- llama.cpp: https://github.com/ggml-org/llama.cpp
+It is not a general AI dashboard, not a RAG stack, and not a leaderboard clone.
