@@ -92,28 +92,71 @@ Full copy/Python/HTML test:
 Mixed Ollama + llama.cpp comparison:
 
 ```bash
-python3 ./run-mixed-naomi-bench.py
+python3 ./run-mixed-bench.py
 ```
 
 Benchmark results are written under `quality-bench/results/` and are not committed.
 
 ## Retuning On Another Machine
 
-The checked-in parameters are a known-good starting point for 6GB VRAM / 24GB RAM. Other systems should retune.
+The checked-in parameters are a known-good starting point for the reference machine: 6GB VRAM / 24GB RAM. Other systems should retune instead of blindly copying the numbers.
 
-Practical rules:
+The tuning loop is:
+
+1. Check the machine:
+
+```bash
+./doctor.sh
+```
+
+2. Pick one candidate from `MODEL_LIST.md`.
+
+3. Edit that row's tuning columns:
+
+```text
+CTX_SIZE      context window to allocate
+GPU_LAYERS    requested GPU layer offload, or lower it when weights OOM
+CACHE_K       K cache type, such as turbo4, turbo3, q8_0, f16
+CACHE_V       V cache type, such as turbo4, turbo3, q8_0, f16
+N_CPU_MOE     number of MoE expert layers kept on CPU; empty for dense models
+```
+
+4. Regenerate local profile env files:
+
+```bash
+./materialize-model-list-profiles.sh
+```
+
+5. Smoke test one profile:
+
+```bash
+./run-quality-bench.sh --stage smoke --profiles qwen36-coder-q4
+```
+
+6. Read the failure mode:
+
+```text
+KV cache OOM       lower CTX_SIZE or use more compressed CACHE_K/CACHE_V
+model weight OOM   lower GPU_LAYERS or choose a smaller quant/model
+very slow output    reduce CPU-heavy dense offload, lower context, or reject the model
+high swap           lower context, use a smaller quant/model, or reduce CPU MoE pressure
+```
+
+7. When the smoke test is stable, run the full task set:
+
+```bash
+./run-quality-bench.sh --stage full --profiles qwen36-coder-q4
+```
+
+8. Keep the model only if it improves speed, quality, RAM/swap pressure, or a specific task such as HTML/CSS.
+
+Practical rules of thumb:
 
 - If a model already fits comfortably, try `q8_0/q8_0` KV before TurboQuant; compressed KV can be overhead.
 - If long context causes VRAM OOM, lower context first, then use `turbo4/turbo4` or `turbo4/turbo3`.
 - MoE models are usually better small-VRAM candidates than dense models because CPU expert offload can help.
 - Dense models with partial GPU offload can become very slow on 6GB cards.
 - Keep one gold baseline and make every new candidate justify itself by speed, quality, or lower RAM/swap.
-
-Regenerate local env profiles from the manifest:
-
-```bash
-./materialize-model-list-profiles.sh
-```
 
 ## What This Project Is
 

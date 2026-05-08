@@ -31,7 +31,7 @@ Run the full set only after smoke results are worth the time:
 For Ollama comparison models:
 
 ```bash
-python3 ./run-mixed-naomi-bench.py
+python3 ./run-mixed-bench.py
 ```
 
 ## Metrics

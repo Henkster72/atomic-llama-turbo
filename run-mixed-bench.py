@@ -19,6 +19,55 @@ ROOT = Path(__file__).resolve().parent
 PROMPT_DIR = ROOT / "quality-bench" / "prompts"
 RESULT_ROOT = ROOT / "quality-bench" / "results"
 
+DEFAULT_COPY_PROMPT = """You are an expert conversion copywriter.
+
+Write practical, persuasive website copy for a small business website service called Example Custom Websites.
+
+Offer:
+- custom websites for small businesses, freelancers, and local service providers
+- fast static sites where appropriate
+- optional hosting, domain setup, email, SEO, branding, and maintenance
+- a clear middle ground between generic DIY builders and expensive agencies
+
+Tone:
+Clear, specific, confident, lightly cheeky, not generic SaaS.
+
+Output:
+1. Five homepage hero headlines.
+2. Five subheadlines.
+3. Five CTA labels.
+4. One short problem section about generic website builders.
+5. One short value section explaining why a bespoke website can be a better business asset.
+"""
+
+DEFAULT_HTML_PROMPT = """Create one complete single-file HTML document with embedded CSS only.
+
+Use case:
+A custom website design service for small businesses.
+
+Goal:
+Create a polished landing-page visual concept that communicates bespoke design, speed, practical support, and a move from generic templates to a website made for the business.
+
+Requirements:
+- semantic HTML
+- embedded CSS
+- responsive layout
+- no JavaScript
+- no external libraries
+- no external images
+- a header, hero, visual website/mockup metaphor, at least four service cards, pricing/value strip, and footer CTA
+- use the copy deck provided by the benchmark where it fits
+- output only the complete HTML file, no Markdown fences
+"""
+
+DEFAULT_THEME_TEXT = """{
+  "name": "generic-alt-benchmark-theme",
+  "style": "modern, high contrast, polished, business-friendly",
+  "colors": ["#101820", "#f2aa4c", "#2ec4b6", "#ffffff"],
+  "notes": "Use this as loose inspiration, not as a rigid design system."
+}
+"""
+
 
 @dataclass
 class Target:
@@ -50,6 +99,15 @@ def load_dotenv() -> None:
 
 def read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
+
+
+def read_optional(path_value: str | None, fallback: str) -> str:
+    if not path_value:
+        return fallback
+    path = Path(path_value).expanduser()
+    if path.exists():
+        return read(path)
+    raise FileNotFoundError(path)
 
 
 def strip_fence(text: str, extension: str) -> str:
@@ -278,15 +336,15 @@ def default_targets(ollama_url: str, llama_url: str) -> list[Target]:
 
 def main() -> None:
     load_dotenv()
-    parser = argparse.ArgumentParser(description="Compare Ollama small models and Atomic Llama Turbo qwen36 on Naomi copy + HTML prompts.")
+    parser = argparse.ArgumentParser(description="Compare Ollama small models and Atomic Llama Turbo profiles on generic copy + HTML prompts.")
     parser.add_argument("--ollama-url", default=os.environ.get("OLLAMA_URL", "http://127.0.0.1:11434"))
     parser.add_argument("--llama-url", default=os.environ.get("MIXED_LLAMA_URL", "http://127.0.0.1:18083"))
     parser.add_argument("--llama-port", type=int, default=int(os.environ.get("MIXED_LLAMA_PORT", "18083")))
     parser.add_argument("--llama-container", default=os.environ.get("MIXED_LLAMA_CONTAINER", "atomic-mixed-bench"))
-    parser.add_argument("--copy-prompt", default=str(PROMPT_DIR / "copy_naomidongelmans.md"))
-    parser.add_argument("--html-prompt", default=str(PROMPT_DIR / "code_naomidongelmans_html_visual.md"))
-    parser.add_argument("--theme-file", default=str(PROMPT_DIR / "Theme candy.json"))
-    parser.add_argument("--result-dir", help="Optional result directory. Defaults to quality-bench/results/<timestamp>__mixed_naomi.")
+    parser.add_argument("--copy-prompt", help="Optional copy prompt file. Uses a generic built-in prompt by default.")
+    parser.add_argument("--html-prompt", help="Optional HTML/CSS prompt file. Uses a generic built-in prompt by default.")
+    parser.add_argument("--theme-file", help="Optional theme/reference file. Uses a generic built-in theme by default.")
+    parser.add_argument("--result-dir", help="Optional result directory. Defaults to quality-bench/results/<timestamp>__mixed.")
     parser.add_argument("--copy-max-tokens", type=int, default=2600)
     parser.add_argument("--html-max-tokens", type=int, default=3200)
     parser.add_argument("--copy-temperature", type=float, default=0.55)
@@ -297,18 +355,18 @@ def main() -> None:
     parser.add_argument("--keep-ollama-loaded", action="store_true")
     args = parser.parse_args()
 
-    copy_prompt = read(Path(args.copy_prompt))
-    html_prompt_base = read(Path(args.html_prompt))
-    theme_text = read(Path(args.theme_file))
+    copy_prompt = read_optional(args.copy_prompt, DEFAULT_COPY_PROMPT)
+    html_prompt_base = read_optional(args.html_prompt, DEFAULT_HTML_PROMPT)
+    theme_text = read_optional(args.theme_file, DEFAULT_THEME_TEXT)
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    result_dir = Path(args.result_dir).expanduser() if args.result_dir else RESULT_ROOT / f"{stamp}__mixed_naomi"
+    result_dir = Path(args.result_dir).expanduser() if args.result_dir else RESULT_ROOT / f"{stamp}__mixed"
     if not result_dir.is_absolute():
         result_dir = (Path.cwd() / result_dir).resolve()
 
     targets = default_targets(args.ollama_url, args.llama_url)
-    print("Mixed Naomi benchmark plan:")
+    print("Mixed benchmark plan:")
     for target in targets:
-        print(f"  - {target.name}: {target.backend} {target.model} -> copy_naomidongelmans, code_naomidongelmans_html_visual")
+        print(f"  - {target.name}: {target.backend} {target.model} -> copy_generic, html_visual_generic")
     print(f"Result directory: {result_dir}")
     if args.dry_run:
         return
@@ -336,9 +394,9 @@ def main() -> None:
                     if target.backend == "ollama"
                     else openai_chat(target.base_url or args.llama_url, target.model, copy_prompt, temperature=args.copy_temperature, max_tokens=args.copy_max_tokens, timeout=args.timeout)
                 )
-                copy_name = f"{target.name}__copy_naomidongelmans.md"
-                write_artifact(result_dir / copy_name, target.name, target.model, "copy_naomidongelmans", copy_answer, "md")
-                row = record_row(target, "copy_naomidongelmans", copy_name, copy_answer, copy_stats)
+                copy_name = f"{target.name}__copy_generic.md"
+                write_artifact(result_dir / copy_name, target.name, target.model, "copy_generic", copy_answer, "md")
+                row = record_row(target, "copy_generic", copy_name, copy_answer, copy_stats)
                 rows.append(row)
                 metrics.write(json.dumps(row, ensure_ascii=False) + "\n")
                 metrics.flush()
@@ -350,9 +408,9 @@ def main() -> None:
                     if target.backend == "ollama"
                     else openai_chat(target.base_url or args.llama_url, target.model, html_prompt, temperature=args.html_temperature, max_tokens=args.html_max_tokens, timeout=args.timeout)
                 )
-                html_name = f"{target.name}__code_naomidongelmans_html_visual.html"
-                write_artifact(result_dir / html_name, target.name, target.model, "code_naomidongelmans_html_visual", html_answer, "html")
-                row = record_row(target, "code_naomidongelmans_html_visual", html_name, html_answer, html_stats)
+                html_name = f"{target.name}__html_visual_generic.html"
+                write_artifact(result_dir / html_name, target.name, target.model, "html_visual_generic", html_answer, "html")
+                row = record_row(target, "html_visual_generic", html_name, html_answer, html_stats)
                 rows.append(row)
                 metrics.write(json.dumps(row, ensure_ascii=False) + "\n")
                 metrics.flush()
@@ -369,14 +427,14 @@ def main() -> None:
             run_cmd([str(ROOT / "atomic-server.sh"), "stop"], env=env, check=False)
 
     lines = [
-        "# Mixed Naomi Benchmark",
+        "# Mixed Benchmark",
         "",
         f"- Run: `{result_dir.name}`",
         f"- Ollama URL: `{args.ollama_url}`",
         f"- llama.cpp URL: `{args.llama_url}`",
-        f"- Copy prompt: `{Path(args.copy_prompt).name}`",
-        f"- HTML prompt: `{Path(args.html_prompt).name}`",
-        f"- Theme file: `{Path(args.theme_file).name}`",
+        f"- Copy prompt: `{Path(args.copy_prompt).name if args.copy_prompt else 'built-in generic copy prompt'}`",
+        f"- HTML prompt: `{Path(args.html_prompt).name if args.html_prompt else 'built-in generic HTML prompt'}`",
+        f"- Theme file: `{Path(args.theme_file).name if args.theme_file else 'built-in generic theme'}`",
         "",
         "| Profile | Backend | Task | Output | First token | Total | Gen tok/s | Words | Notes |",
         "|---|---|---|---|---:|---:|---:|---:|---|",
