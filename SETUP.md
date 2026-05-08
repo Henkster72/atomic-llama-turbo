@@ -2,6 +2,14 @@
 
 Atomic Llama Turbo is designed for a clean host and a CUDA-enabled container.
 
+It answers one practical question:
+
+> What model/quant/context combination is actually usable on my machine?
+
+You do not need a datacenter GPU. You need the right cursed incantation of llama.cpp flags. :-)
+
+This repository is not a Python package. Do not install it with `pip install .`; there is no `setup.py` or `pyproject.toml`. Run the shell and Python helper scripts directly from the checked-out folder.
+
 Reference machine:
 
 ```text

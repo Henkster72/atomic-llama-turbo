@@ -10,6 +10,12 @@ Atomic Llama Turbo is a container-first recipe for running and comparing local G
 
 The point is not to collect every model. The point is to find a small set of profiles that are actually useful for copywriting, HTML/CSS visuals, and Python coding.
 
+The core question:
+
+> What model/quant/context combination is actually usable on my machine?
+
+You do not need a datacenter GPU. You need the right cursed incantation of llama.cpp flags. :-)
+
 ## Current Bench Set
 
 These are the maintained benchmark choices in `MODEL_LIST.md`:
@@ -32,6 +38,8 @@ Observed on the reference machine:
 Raw benchmark outputs, prompts, chats, model cache, and generated temp profiles are intentionally ignored by git.
 
 ## Quick Start
+
+This is not a Python package and is not installed with `pip install .`. Use it from the checked-out folder as a script-driven container toolkit.
 
 Check the machine:
 
