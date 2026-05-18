@@ -120,6 +120,14 @@ For managed server switching:
 ./atomic-server.sh stop
 ```
 
+Start the default local server and web chat together:
+
+```bash
+./start-alt.sh
+```
+
+The web UI comes up on `http://127.0.0.1:8090` and talks to the local model server on `http://127.0.0.1:8080`.
+
 ## Benchmark
 
 Smoke test the llama.cpp bench set:

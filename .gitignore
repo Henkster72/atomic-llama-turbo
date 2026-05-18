@@ -9,11 +9,13 @@ __pycache__/
 *.kate-swp
 .*.kate-swp
 .DS_Store
+agent.md
 
 # Logs and runtime leftovers
 *.log
 *.pid
 *.sock
+.alt-runtime/
 
 # Generated benchmark output
 bench/results/

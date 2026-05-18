@@ -27,6 +27,7 @@ HEALTH_URL = f"{BASE_URL}/health"
 MODELS_URL = f"{BASE_URL}/v1/models"
 MODEL = os.environ.get("ATOMIC_MODEL", os.environ.get("QWEN_MODEL", "qwen"))
 SYSTEM = os.environ.get("ATOMIC_SYSTEM", os.environ.get("QWEN_SYSTEM", "You are a concise, practical coding assistant."))
+MAX_TOKENS = int(os.environ.get("ATOMIC_MAX_TOKENS", "4096"))
 ROOT = Path(__file__).resolve().parent
 LOG_DIR = chat_store.CHAT_DIR
 STABLE_SPLIT = "Load split: CUDA model 3845 MiB, TurboKV+RS+compute 1334 MiB, host model 17253 MiB"
@@ -374,7 +375,7 @@ def complete(messages):
     payload = {
         "model": MODEL,
         "messages": messages,
-        "max_tokens": 700,
+        "max_tokens": MAX_TOKENS,
         "temperature": 0.4,
     }
     data = json.dumps(payload).encode("utf-8")

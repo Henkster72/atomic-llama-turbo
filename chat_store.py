@@ -141,6 +141,27 @@ def delete_if_empty(ident):
     return True
 
 
+def delete_chat(ident):
+    removed = False
+    for path in (json_path(ident), md_path(ident)):
+        try:
+            path.unlink()
+            removed = True
+        except FileNotFoundError:
+            pass
+    return removed
+
+
+def rename_chat(ident, title):
+    data = load_chat(ident)
+    title = (title or "").strip()
+    if not title:
+        raise ValueError("title cannot be empty")
+    data["title"] = title
+    save_chat(data)
+    return data
+
+
 def to_llm_messages(data):
     messages = []
     system = data.get("system")
@@ -161,10 +182,14 @@ def list_chats():
             data = json.loads(path.read_text(encoding="utf-8"))
         except Exception:
             continue
+        title = data.get("title") or "New chat"
+        if title in {"", "New chat"}:
+            title = title_from_messages(data.get("messages", []), title)
         items[data["id"]] = {
             "id": data["id"],
-            "title": title_from_messages(data.get("messages", []), data.get("title") or "New chat"),
+            "title": title,
             "source": data.get("source", "unknown"),
+            "created_at": data.get("created_at", ""),
             "updated_at": data.get("updated_at", ""),
             "md_path": str(md_path(data["id"])),
             "md_name": md_path(data["id"]).name,
@@ -180,13 +205,18 @@ def list_chats():
             "id": ident,
             "title": title_from_messages(data.get("messages", []), data.get("title") or ident),
             "source": "legacy-md",
+            "created_at": data.get("created_at", ""),
             "updated_at": data.get("updated_at", ""),
             "md_path": str(path),
             "md_name": path.name,
             "model": data.get("model") or "",
             "message_count": len(data.get("messages", [])),
         }
-    return sorted(items.values(), key=lambda item: item.get("updated_at", ""), reverse=True)
+    return sorted(
+        items.values(),
+        key=lambda item: (item.get("updated_at") or item.get("created_at") or "", item.get("id") or ""),
+        reverse=True,
+    )
 
 
 def write_markdown(data):
